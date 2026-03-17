@@ -1,0 +1,13 @@
+# Core HTTP client
+requests>=2.31.0
+
+# RSS parsing (optional but useful)
+feedparser>=6.0.10
+
+# HTML parsing (optional, future use)
+beautifulsoup4>=4.12.2
+lxml>=5.1.0
+
+# UI + data handling
+streamlit>=1.35.0
+pandas>=2.2.0
