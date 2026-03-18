@@ -116,17 +116,46 @@ archival = informational only
 
 ---
 
+## STEP 6: CONTROVERSY HOOK (optional)
+
+Only populate this field if the article contains a signal that:
+- contradicts a widely held assumption about AI
+- reveals a gap between what institutions say and what they do
+- echoes a pattern from a previous tech cycle (dot-com, social media, mobile)
+- has clear implications for workers, professionals, or ordinary people
+  that are being underreported or framed as progress
+
+If none of the above apply, return an empty string "".
+
+This field is a ONE-LINE provocation — not a summary.
+Write it as something worth arguing about.
+
+Examples of strong hooks:
+- "Every major platform said the same thing about user data. Now they say the same thing about your job."
+- "We called it disruption in 2001. We're calling it transformation now. The pink slips look the same."
+- "Governance frameworks keep arriving after the products. This one is no different."
+
+Examples of weak hooks (do not use):
+- "This raises important questions about AI governance."
+- "The implications for workers remain unclear."
+- "Experts are divided on the impact."
+
+If you cannot write a genuinely sharp hook, return "".
+
+---
+
 ## HARD RULES
 
 - You MUST choose IGNORE if weak relevance
 - You MUST NOT overuse SHORTLIST
 - You MUST prioritize signal over description
+- controversy_hook is OPTIONAL — empty string is correct when not applicable
 
 ---
 
 ## OUTPUT
 
-Return JSON only:
+Return JSON only. No preamble, no explanation, no markdown fences.
 
 {
   "decision": "ignore | monitor | shortlist",
@@ -134,5 +163,6 @@ Return JSON only:
   "primary_signal": "...",
   "darkaidefense_angle": "...",
   "why_it_matters": "...",
-  "confidence": 0.0
+  "confidence": 0.0,
+  "controversy_hook": "..."
 }

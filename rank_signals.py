@@ -1,6 +1,6 @@
 import os
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict
 
 # =========================
@@ -39,24 +39,97 @@ def load_enriched_items() -> List[Dict]:
 
 
 # =========================
-# DATE FILTER (WEEKLY WINDOW)
+# DEDUPLICATION
+# Fix: same article captured on different days produces multiple enriched
+# files with different doc_ids. Deduplicate by URL, keeping the most
+# recently analyzed copy.
 # =========================
 
-def is_within_window(item: Dict) -> bool:
+def deduplicate_by_url(items: List[Dict]) -> List[Dict]:
+    seen: Dict[str, Dict] = {}
+
+    for item in items:
+        url = item.get("url", "").strip()
+        if not url:
+            # No URL — keep as-is, use doc_id as key
+            key = item.get("doc_id", id(item))
+            seen[key] = item
+            continue
+
+        existing = seen.get(url)
+        if existing is None:
+            seen[url] = item
+        else:
+            # Keep whichever was analyzed more recently
+            existing_ts = existing.get("analyzed_at", "")
+            current_ts = item.get("analyzed_at", "")
+            if current_ts > existing_ts:
+                seen[url] = item
+
+    deduped = list(seen.values())
+    removed = len(items) - len(deduped)
+    if removed > 0:
+        print(f"[INFO] Deduplicated {removed} duplicate URL(s)")
+
+    return deduped
+
+
+# =========================
+# DATE FILTER (WEEKLY WINDOW)
+# Fix: datetime.utcnow() returns a naive datetime; enriched items store
+# timezone-aware ISO strings. Mixed comparison raises TypeError, which
+# was silently caught and returned True (items passed through incorrectly).
+# Now using timezone.utc throughout.
+# =========================
+
+def parse_dt_utc(value: str) -> datetime:
+    """
+    Parse an ISO 8601 or RFC 2822 datetime string and return a
+    timezone-aware UTC datetime. Raises ValueError if unparseable.
+    """
+    # Handle Z suffix
+    cleaned = value.strip().replace("Z", "+00:00")
+
+    # Try ISO format first
     try:
-        published = item.get("published_at")
-        if not published:
-            return True
+        dt = datetime.fromisoformat(cleaned)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+    except ValueError:
+        pass
 
-        try:
-            dt = datetime.fromisoformat(published)
-        except Exception:
-            dt = datetime.strptime(published, "%a, %d %b %Y %H:%M:%S %Z")
-
-        cutoff = datetime.utcnow() - timedelta(days=DAYS_BACK)
-        return dt >= cutoff
-
+    # Try RFC 2822 (e.g. "Mon, 01 Jan 2024 00:00:00 GMT")
+    try:
+        from email.utils import parsedate_to_datetime
+        dt = parsedate_to_datetime(value.strip())
+        return dt.astimezone(timezone.utc)
     except Exception:
+        pass
+
+    # Try bare date
+    try:
+        dt = datetime.strptime(value.strip()[:10], "%Y-%m-%d")
+        return dt.replace(tzinfo=timezone.utc)
+    except ValueError:
+        pass
+
+    raise ValueError(f"Unparseable datetime: {value!r}")
+
+
+def is_within_window(item: Dict) -> bool:
+    published = item.get("published_at")
+    if not published:
+        return True
+
+    try:
+        dt = parse_dt_utc(published)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=DAYS_BACK)
+        return dt >= cutoff
+    except Exception:
+        # If we genuinely cannot parse the date, include the item
+        # rather than silently drop it, but log a warning
+        print(f"[WARN] Could not parse published_at for doc_id={item.get('doc_id')}: {published!r} — included by default")
         return True
 
 
@@ -135,10 +208,11 @@ def rank_signals(items: List[Dict]) -> List[Dict]:
 
 # =========================
 # OUTPUT
+# Fix: datetime.utcnow() replaced with timezone-aware equivalent
 # =========================
 
 def save_outputs(ranked: List[Dict]):
-    timestamp = datetime.utcnow().strftime("%Y-%m-%d")
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     top_signals = ranked[:TOP_N]
 
@@ -155,6 +229,9 @@ def save_outputs(ranked: List[Dict]):
             "title": x["title"],
             "url": x.get("url"),
             "signal": x["analysis"].get("primary_signal"),
+            "darkaidefense_angle": x["analysis"].get("darkaidefense_angle", ""),
+            "why_it_matters": x["analysis"].get("why_it_matters", ""),
+            "controversy_hook": x["analysis"].get("controversy_hook", ""),
             "decision": x["analysis"].get("decision"),
             "time_horizon": x["analysis"].get("time_horizon"),
             "confidence": x["analysis"].get("confidence"),
@@ -182,7 +259,11 @@ def main():
     items = load_enriched_items()
     print(f"Loaded: {len(items)} items")
 
-    print("Filtering monitor/shortlist...")
+    print("Deduplicating by URL...")
+    items = deduplicate_by_url(items)
+    print(f"After dedup: {len(items)} items")
+
+    print("Filtering monitor/shortlist within weekly window...")
     filtered = filter_signals(items)
     print(f"Filtered: {len(filtered)} signals")
 
@@ -197,4 +278,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    

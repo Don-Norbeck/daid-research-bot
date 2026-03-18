@@ -1,7 +1,8 @@
+import argparse
 import json
 import re
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -23,7 +24,10 @@ REQUEST_TIMEOUT = 180
 MAX_RAW_TEXT_CHARS = 12000
 SLEEP_BETWEEN_CALLS_SEC = 0.25
 ONLY_UNANALYZED = True
-MAX_ANALYZE_PER_RUN = 50
+
+# Raised from 50. For normal weekly runs this is plenty.
+# Use --days-back 30 --max 200 for a backlog clear.
+DEFAULT_MAX_PER_RUN = 100
 
 
 def ensure_dirs() -> None:
@@ -139,6 +143,10 @@ def coerce_analysis_schema(data: Dict[str, Any]) -> Dict[str, Any]:
     why_it_matters = str(data.get("why_it_matters", "")).strip()
     confidence = clamp_float(data.get("confidence", 0.0))
 
+    # controversy_hook: optional field added in updated prompt.
+    # Older enriched files will not have it — default to empty string.
+    controversy_hook = str(data.get("controversy_hook", "")).strip()
+
     return {
         "decision": decision,
         "time_horizon": time_horizon,
@@ -146,6 +154,7 @@ def coerce_analysis_schema(data: Dict[str, Any]) -> Dict[str, Any]:
         "darkaidefense_angle": darkaidefense_angle,
         "why_it_matters": why_it_matters,
         "confidence": confidence,
+        "controversy_hook": controversy_hook,
     }
 
 
@@ -209,7 +218,8 @@ def call_local_model(prompt_text: str, article_text: str) -> Dict[str, Any]:
                 "type": "number",
                 "minimum": 0.0,
                 "maximum": 1.0
-            }
+            },
+            "controversy_hook": {"type": "string"},
         },
         "required": [
             "decision",
@@ -217,7 +227,8 @@ def call_local_model(prompt_text: str, article_text: str) -> Dict[str, Any]:
             "primary_signal",
             "darkaidefense_angle",
             "why_it_matters",
-            "confidence"
+            "confidence",
+            "controversy_hook",
         ]
     }
 
@@ -325,11 +336,23 @@ def analyze_item(item_path: Path, prompt_text: str) -> bool:
         "decision": analysis.get("decision"),
         "time_horizon": analysis.get("time_horizon"),
         "confidence": analysis.get("confidence"),
+        "controversy_hook_present": bool(analysis.get("controversy_hook")),
     })
     return True
 
 
-def list_candidate_items() -> List[Path]:
+def list_candidate_items(days_back: Optional[int], max_items: int) -> List[Path]:
+    """
+    Return candidate items sorted newest-first.
+
+    days_back: if set, only include items published within this window.
+               Items with no parseable published_at are always included.
+    max_items: hard cap on returned candidates.
+    """
+    cutoff: Optional[datetime] = None
+    if days_back is not None:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days_back)
+
     candidates: List[tuple[Path, datetime]] = []
 
     for item_path in ITEMS_DIR.glob("*.json"):
@@ -341,6 +364,12 @@ def list_candidate_items() -> List[Path]:
             continue
 
         published_dt = parse_published_at(item.get("published_at"))
+
+        # Apply date filter if set
+        if cutoff is not None and published_dt is not None:
+            if published_dt < cutoff:
+                continue
+
         if published_dt is None:
             published_dt = datetime.min.replace(tzinfo=timezone.utc)
 
@@ -348,20 +377,58 @@ def list_candidate_items() -> List[Path]:
 
     candidates.sort(key=lambda x: x[1], reverse=True)
 
-    return [path for path, _ in candidates[:MAX_ANALYZE_PER_RUN]]
+    return [path for path, _ in candidates[:max_items]]
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Analyze captured RSS items with local LLM."
+    )
+    parser.add_argument(
+        "--days-back",
+        type=int,
+        default=None,
+        help="Only analyze items published within this many days. "
+             "Default: no date filter (analyze all unanalyzed items up to --max). "
+             "Use --days-back 30 for a targeted backlog clear.",
+    )
+    parser.add_argument(
+        "--max",
+        type=int,
+        default=DEFAULT_MAX_PER_RUN,
+        help=f"Maximum items to analyze in this run (default: {DEFAULT_MAX_PER_RUN}). "
+             "Set higher for backlog clearing.",
+    )
+    parser.add_argument(
+        "--reanalyze",
+        action="store_true",
+        default=False,
+        help="Re-analyze items that already have an enriched file. "
+             "Use after updating the prompt to pick up controversy_hook.",
+    )
+    return parser.parse_args()
 
 
 def main() -> None:
+    args = parse_args()
+
+    global ONLY_UNANALYZED
+    if args.reanalyze:
+        ONLY_UNANALYZED = False
+        print("[INFO] --reanalyze: will overwrite existing enriched files")
+
     ensure_dirs()
     prompt_text = load_prompt()
 
     check_ollama_available()
     ensure_model_loaded()
 
-    candidates = list_candidate_items()
+    candidates = list_candidate_items(days_back=args.days_back, max_items=args.max)
 
     print(f"Using model: {LOCAL_MODEL}")
     print(f"Ollama endpoint: {OLLAMA_API_URL}")
+    print(f"Days-back filter: {args.days_back if args.days_back else 'none'}")
+    print(f"Max per run: {args.max}")
     print(f"Candidate items: {len(candidates)}")
 
     if not candidates:
