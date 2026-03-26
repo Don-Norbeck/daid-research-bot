@@ -1,0 +1,6 @@
+{
+  "analysis_model": "llama3.1:8b",
+  "conv_model": "llama3.1:latest",
+  "days_back": 7,
+  "max_items": 100
+}

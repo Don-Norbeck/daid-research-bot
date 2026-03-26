@@ -1,0 +1,124 @@
+{
+  "AI Governance & Policy": [
+    {
+      "name": "AI Now Institute",
+      "url": "https://ainowinstitute.org/category/news/feed"
+    },
+    {
+      "name": "Future of Life Institute",
+      "url": "https://futureoflife.org/feed/"
+    },
+    {
+      "name": "CSET Georgetown",
+      "url": "https://cset.georgetown.edu/feed/"
+    },
+    {
+      "name": "Stanford HAI",
+      "url": "https://hai.stanford.edu/news/rss.xml"
+    },
+    {
+      "name": "Brookings Tech",
+      "url": "https://www.brookings.edu/topic/technology-innovation/feed/"
+    }
+  ],
+  "Agentic Systems & Automation": [
+    {
+      "name": "LangChain Blog",
+      "url": "https://blog.langchain.dev/rss/"
+    },
+    {
+      "name": "Interconnects.ai",
+      "url": "https://www.interconnects.ai/feed"
+    },
+    {
+      "name": "The Gradient",
+      "url": "https://www.thegradient.pub/rss/"
+    },
+    {
+      "name": "Hugging Face Blog",
+      "url": "https://huggingface.co/blog/feed.xml"
+    },
+    {
+      "name": "Replicate Blog",
+      "url": "https://replicate.com/blog/rss"
+    }
+  ],
+  "Labor & Economic Disruption": [
+    {
+      "name": "MIT Technology Review",
+      "url": "https://www.technologyreview.com/feed/"
+    },
+    {
+      "name": "One Useful Thing",
+      "url": "https://www.oneusefulthing.org/feed"
+    },
+    {
+      "name": "VentureBeat AI",
+      "url": "https://venturebeat.com/category/ai/feed/"
+    },
+    {
+      "name": "The Register AI",
+      "url": "https://www.theregister.com/software/ai_ml/headlines.atom"
+    }
+  ],
+  "AI Misuse & Security": [
+    {
+      "name": "Wired AI",
+      "url": "https://www.wired.com/feed/tag/ai/latest/rss"
+    },
+    {
+      "name": "AI News",
+      "url": "https://www.artificialintelligence-news.com/feed/rss/"
+    },
+    {
+      "name": "TechCrunch AI",
+      "url": "https://techcrunch.com/category/artificial-intelligence/feed/"
+    },
+    {
+      "name": "The Verge AI",
+      "url": "https://www.theverge.com/ai-artificial-intelligence/rss/index.xml"
+    }
+  ],
+  "Infrastructure & Power Concentration": [
+    {
+      "name": "SemiAnalysis",
+      "url": "https://www.semianalysis.com/feed"
+    },
+    {
+      "name": "NVIDIA Developer Blog",
+      "url": "https://developer.nvidia.com/blog/feed"
+    },
+    {
+      "name": "IEEE Spectrum AI",
+      "url": "https://spectrum.ieee.org/feeds/topic/artificial-intelligence.rss"
+    },
+    {
+      "name": "MIT News ML",
+      "url": "https://news.mit.edu/topic/mitmachine-learning-rss.xml"
+    }
+  ],
+  "Scientific Acceleration": [
+    {
+      "name": "DeepMind Blog",
+      "url": "https://deepmind.com/blog/feed/basic/"
+    },
+    {
+      "name": "OpenAI Blog",
+      "url": "https://openai.com/blog/rss/"
+    },
+    {
+      "name": "Cohere Blog",
+      "url": "https://txt.cohere.ai/rss/"
+    }
+  ],
+  "Culture & Media Criticism": [
+    {
+      "name": "Last Week in AI",
+      "url": "https://lastweekin.ai/feed"
+    },
+    {
+      "name": "Reuters Tech",
+      "url": "https://www.reutersagency.com/feed/?best-topics=tech"
+    }
+  ]
+}
