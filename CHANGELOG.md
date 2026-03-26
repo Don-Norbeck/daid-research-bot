@@ -2,6 +2,85 @@
 
 ---
 
+## v0.2 — Pitch-Bot-Centric UI
+**Released:** March 26, 2026
+
+Complete redesign of the Streamlit interface. Replaced the five-tab layout with a single-page, pitch-bot-centric experience. The Pitch Bot is now the home screen — everything else is subordinate, accessible through reach-back accordions only when needed.
+
+### What changed
+
+**UI architecture — full rewrite of `app.py`**
+
+The tab-based layout (System / Interests / Feeds / Signals / Pitch Bot) was replaced with a single scrolling page organized around the editorial workflow:
+
+- **Pitch Bot** is the dominant view — signal selector, archetype picker, feedback field, Generate and Remix buttons, brief output, and saved briefs history
+- **Five reach-back accordions** below the brief, closed by default, labeled by intent rather than function:
+  - 📡 Want fresher stories? — RSS age status, Pull Feeds, Pull + Re-analyze + Pitch
+  - 🎯 Want different topics? — topic editor, AI conversation for suggestions, Save + Re-analyze + Pitch
+  - 📻 Change your feeds? — active feed list with remove, add by URL, curated library
+  - 🤖 Want a different voice? — model selector with size/speed labels, load into memory, regenerate brief
+  - ⚙️ Advanced settings — pipeline settings, individual step buttons, Ollama controls
+
+**Pitch Bot**
+- Seven named archetypes: The Straight Story, The Connection, The Cassandra, The Comic Miss, The Autopsy, The Pattern Match, The Slow Burn
+- Each archetype has a distinct system prompt shaping the 250-word brief
+- **Next Angle** button rotates archetypes without losing signal selection
+- **Remix** button regenerates the same signal + archetype with fresh wording
+- **Feedback field** steers the brief — freetext injected into the generation prompt
+- Author voice and editorial temperature from profile injected into every brief
+- Active topics from interests profile included in context
+- Accept signal button writes to `data/editorial/signal_memory.json`
+- Copy, Save brief, and saved briefs history with expander view
+- Model shown in corner of brief output
+
+**RSS age indicator**
+- Header bar shows days since last feed pull
+- Green under 3 days, yellow 3-7 days, red over 7 days
+- "Want fresher stories?" accordion auto-expands when feeds are over 7 days old
+
+**Model management**
+- Model dropdowns now use labeled options showing size and speed: `mistral-nemo:12b — Medium · Balanced`
+- Code and embedding models flagged with ⚠️ warnings in dropdowns
+- Models too large for typical local hardware labeled accordingly
+- Model selections auto-save to `config/settings.json` on change — no Save button needed
+- "Load analysis model into memory" button warms up the selected analysis model
+
+**Topics / Interests**
+- Default topic checklist (8 AI-focused topics) as a baseline
+- AI conversation in the same panel surfaces additional topic suggestions dynamically
+- Suggested topics appear as a second checkbox list — select what applies
+- Both lists merge into `profile["topics"]` on save
+- Save + Re-analyze + Pitch runs the analysis pipeline immediately after saving
+
+**Feed manager**
+- Active feed list with per-feed remove buttons
+- Add by URL with duplicate detection
+- Curated feed library organized by topic category (7 categories, ~35 feeds)
+- One-click add from curated library
+
+**Pipeline runner**
+- Split into two logical operations: **Refresh Feeds** (capture only) and **Run Analysis → Pitch** (analyze + rank + pitch, no capture)
+- Individual stage buttons available in Advanced Settings for debugging
+- Live log streaming for all pipeline operations
+- `config/settings.json` stores days-back window and max items, passed to `analyze_local.py` as flags
+
+**Signal memory**
+- Accept / Pass decisions written to `data/editorial/signal_memory.json`
+- Accepted signals float to the top of the Pitch Bot signal selector
+
+### Hardware notes
+Tested on Dell XPS 8700 with NVIDIA RTX 3060 (12GB VRAM).
+Brief generation: 10-15 seconds on `mistral-nemo:12b` with model warm in memory.
+Close GPU-heavy background apps before pipeline runs.
+
+### Known limitations
+- Topics set in Interests must be saved before they influence analysis — not yet injected into `analyze_local.py` prompt automatically
+- Signal memory stores accept/pass decisions but does not yet influence ranking scores
+- Feed health indicators (error detection per feed) deferred to v0.3
+- `st.text_input("")` empty label warnings in terminal — cosmetic only, no functional impact
+
+---
+
 ## v0.1 — Foundation
 **Released:** March 18, 2026
 
@@ -12,13 +91,13 @@ Captures RSS feeds → analyzes each article with a local LLM → filters and ra
 
 ### Pipeline
 ```
-capture_local.py   →  ingest RSS feeds          →  data/items/
-analyze_local.py   →  LLM analysis              →  data/enriched/
-rank_signals.py    →  scoring + ranking          →  data/outputs/
-pitch_bot.py       →  pitch generation           →  data/outputs/
-trending_tracker.py → topic frequency tracking  →  data/trends.json
-app.py             →  Streamlit UI
-run_all.py         →  one-command pipeline runner
+capture_local.py    →  ingest RSS feeds         →  data/items/
+analyze_local.py    →  LLM analysis             →  data/enriched/
+rank_signals.py     →  scoring + ranking         →  data/outputs/
+pitch_bot.py        →  pitch generation          →  data/outputs/
+trending_tracker.py →  topic frequency tracking  →  data/trends.json
+app.py              →  Streamlit UI
+run_all.py          →  one-command pipeline runner
 ```
 
 ### Features
@@ -54,17 +133,7 @@ run_all.py         →  one-command pipeline runner
 - Full analysis fields preserved in weekly summary (darkaidefense_angle, why_it_matters, controversy_hook)
 
 **Pitch Generation (`pitch_bot.py`)**
-- Gen X Pattern Library — 10 cultural patterns matched against signal text without additional LLM calls:
-  - The Pink Slip Pattern (labor displacement)
-  - The Governance Lag (policy always arrives late)
-  - The Wind-Up Toy Problem (autonomous system drift)
-  - The Platform Lock-In Cycle (infrastructure as strategy)
-  - The Data Bargain (free products and their real cost)
-  - The Dual-Use Default (capability misuse)
-  - The Balloon Animal Economy (valuation vs reality)
-  - The TPS Report Problem (performative productivity)
-  - The Science Acceleration Gap (capability outpacing ethics)
-  - The Creative Class Squeeze (platform disruption of creative work)
+- Gen X Pattern Library — 10 cultural patterns matched against signal text
 - Theme classification across 8 signal categories
 - Outputs Markdown pitch report (`pitch_report_*.md`) formatted for Ulysses
 - Outputs structured JSON for UI (`pitch_ideas_*.json`)
@@ -79,28 +148,8 @@ run_all.py         →  one-command pipeline runner
 **Streamlit UI (`app.py`)**
 - Watchlist tab — ranked signals with clickable titles, score, horizon, confidence
 - Pitch Bot tab — Article Ideas (with Gen X lens + controversy hook), LinkedIn Angles, Risk Score Drivers
-- Enriched Items tab — sorted by analyzed_at descending, decision badge in label, controversy hook inline
+- Enriched Items tab — sorted by analyzed_at descending, decision badge in label
 - Raw Outputs tab — file selector sorted by most recent
-
-**Session Management**
-- `start_ai_session.bat` — kills GPU/RAM hogs, sets Ollama env vars, launches pipeline
-- `restore_session.bat` — restarts killed apps after pipeline completes
-- `disable_startup_junk.bat` — one-time startup optimization (run as Administrator)
-
-### LLM Prompt (`prompts/analyze_article.txt`)
-- Selective classification with enforced distribution (most = IGNORE)
-- Confidence variance rules — no defaulting
-- Signal extraction format: "Who did what, and why it matters"
-- DAID contextualization step
-- Time horizon classification
-- Optional controversy_hook generation with quality bar (weak hooks return "")
-
-### Known Limitations
-- `data/items/` backlog: 1,445 captured items, 200 analyzed as of v0.1
-- No UI controls for pipeline execution — scripts run from terminal
-- Feed management requires manual editing of `feeds.json`
-- Editorial feedback not yet implemented — no way to mark pitches as accepted/rejected
-- Trending data requires 3-4 weekly runs before trend directions are meaningful
 
 ### Requirements
 ```
@@ -112,15 +161,7 @@ pandas>=2.2.0
 requests>=2.31.0
 ```
 
-### Hardware Notes
-Tested on Dell XPS 8700 with NVIDIA RTX 4060 (8GB VRAM).
-Close GPU-heavy background apps before pipeline runs (Teams, ChatGPT, LinkedIn, Steam).
-Use `start_ai_session.bat` to automate this.
+### Hardware notes
+Tested on Dell XPS 8700 with NVIDIA RTX 3060 (12GB VRAM).
+Close GPU-heavy background apps before pipeline runs.
 `llama3.1:8b` is the reliable fallback if `mistral-nemo:12b` fails to load due to VRAM pressure.
-
----
-
-## v0.2 — UI-First Editorial Workflow
-**Status:** In development
-
-See [ROADMAP.md](ROADMAP.md) for planned features.
